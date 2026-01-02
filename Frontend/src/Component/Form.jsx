@@ -3,6 +3,7 @@ import React, { useRef, useState } from "react";
 function Form() {
   const dropdownRef = useRef(null);
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
+  const RAZOREPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY;
 
   const [error, seterror] = useState({});
   const [form, setform] = useState({
@@ -22,6 +23,7 @@ function Form() {
     enddate: "",
     parentphone: "",
     parentaddressproof: "",
+    fees: "",
     agree: false,
   });
 
@@ -150,6 +152,9 @@ function Form() {
     if (!form.enddate.trim()) {
       error.enddate = "End Date is required";
     }
+    if (!form.fees.trim()) {
+      error.fees = "Fees is required";
+    }
 
     if (!form.parentphone.trim()) {
       error.parentphone = "Parent Phone is required";
@@ -169,42 +174,46 @@ function Form() {
     seterror(error);
     return error;
   };
-  const handlsubmit = async (e) => {
-    e.preventDefault();
 
+  const handlsubmit = (e) => {
+    e.preventDefault();
     if (Object.keys(handlvalidate()).length > 0) return;
 
-    try {
-      const formData = new FormData();
+    const fees = parseInt(form.fees);
+    if (!fees || fees <= 0) return alert("Enter valid fees");
 
-      // Append all text/number/date/checkbox fields
-      Object.keys(form).forEach((key) => {
-        if (key !== "resumefile" && key !== "addressproof") {
-          formData.append(key, form[key]);
-        }
-      });
+    // Open Razorpay popup
+    const options = {
+      key: RAZOREPAY_KEY, // your Razorpay key
+      amount: Number(form.fees) * 100, // in paise
+      currency: "INR",
+      name: "Training Fees",
+      description: "Pay your fees",
+      handler: async function (response) {
+        if (!response.razorpay_payment_id) return alert("Payment failed");
+        submitfordata(response.razorpay_payment_id);
+      },
+    };
 
-      // Append files
-      if (form.resumefile) {
-        formData.append("resumefile", form.resumefile);
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
+
+  const submitfordata = async (paymentId) => {
+    const formData = new FormData();
+    Object.keys(form).forEach((key) => formData.append(key, form[key]));
+
+    formData.append("razorpay_payment_id", paymentId);
+
+    const res = await fetch(
+      "http://localhost:8080/student-portal/Backend/index.php",
+      {
+        method: "POST",
+        body: formData,
       }
-      if (form.addressproof) {
-        formData.append("addressproof", form.addressproof);
-      }
-
-      const res = await fetch(
-        "http://localhost:8080/student-portal/Backend/upload.php",
-        {
-          method: "POST",
-          body: formData, // ✅ Do NOT set Content-Type manually
-        }
-      );
-
-      const data = await res.json();
-      console.log(data);
-    } catch (error) {
-      console.log("Request failed", error);
-    }
+    );
+    const data = await res.text();
+    console.log(data);
   };
 
   return (
@@ -213,11 +222,7 @@ function Form() {
         <h1 className="mb-6 text-xl text-center font-semibold lg:text-2xl">
           Register Form{" "}
         </h1>
-        <form
-          method="post"
-          onSubmit={handlsubmit}
-          className="relative border border-gray-100 space-y-4 max-w-screen-lg mx-auto rounded-md bg-white p-6 shadow-xl lg:p-10"
-        >
+        <div className="relative border border-gray-100 space-y-4 max-w-screen-lg mx-auto rounded-md bg-white p-6 shadow-xl lg:p-10">
           {/* FirstName, LastName, MiddleName  */}
           <div className="grid gap-3 md:grid-cols-3">
             <div>
@@ -352,7 +357,6 @@ function Form() {
                 className="hidden"
                 onChange={handleFileChange}
               />
-              {<span className="text-red-500"> {error.addressproof}</span>}
               {/* Custom UI */}
               <label
                 htmlFor="addressproof"
@@ -360,6 +364,7 @@ function Form() {
               >
                 Choose your Address Proof
               </label>
+              {<span className="text-red-500"> {error.addressproof}</span>}
             </div>
 
             <div>
@@ -373,7 +378,6 @@ function Form() {
                 className="hidden"
                 onChange={handleFileChange}
               />
-              {<span className="text-red-500"> {error.resumefile}</span>}
               {/* Custom UI */}
               <label
                 htmlFor="resumefile"
@@ -381,19 +385,22 @@ function Form() {
               >
                 Choose your Latest Resume
               </label>
+              {<span className="text-red-500"> {error.resumefile}</span>}
             </div>
           </div>
           {/* Interested Technology */}
-          <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2">
+            {/* Interested Technology */}
             <div>
-              <label>Interested Technology</label>
-              <div className="relative w-72 mt-2 rounded-lg">
+              <label className="block mb-1">Interested Technology</label>
+              <div className="relative mt-2 rounded-lg">
                 <input
                   type="checkbox"
                   className="peer hidden"
                   id="select-technology"
                   ref={dropdownRef}
                 />
+
                 <label
                   htmlFor="select-technology"
                   className="flex h-12 w-full cursor-pointer items-center justify-between rounded-lg bg-gray-100 px-3 text-sm text-gray-700 ring-blue-400 peer-checked:ring"
@@ -436,17 +443,31 @@ function Form() {
                     </li>
                   ))}
                 </ul>
-                {
-                  <span className="text-red-500">
-                    {" "}
-                    {error.interestedtechnology}
-                  </span>
-                }
+
+                <span className="text-red-500 text-xs">
+                  {error.interestedtechnology}
+                </span>
               </div>
             </div>
+
+            {/* Fees */}
+            <div>
+              <label className="block mb-1">Fees</label>
+              <input
+                type="number"
+                name="fees"
+                value={form.fees}
+                onChange={handlchanges}
+                className="h-12 w-full rounded-md bg-gray-100 px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <span className="text-red-500 text-xs">{error.fees}</span>
+            </div>
+          </div>
+          {/*  Start date and end date*/}
+          <div className="grid gap-3 grid-cols-2 sm:grid-cols-2 lg:grid-cols-2">
             <div>
               <label className="block mb-1">Start Date</label>
-              <div className="relative w-72">
+              <div className="relative ">
                 <input
                   type="date"
                   name="startdate"
@@ -460,7 +481,7 @@ function Form() {
             <div>
               <label className="block mb-1">End Date</label>
 
-              <div className="relative w-72">
+              <div className="relative">
                 <input
                   type="date"
                   name="enddate"
@@ -473,6 +494,12 @@ function Form() {
             </div>
           </div>
           {/* Optional Section Linkdin Link */}
+          <hr className="my-6" />
+          <div>
+            <h1 className="mb-6 text-xl text-center font-semibold lg:text-2xl">
+              Links :{" "}
+            </h1>
+          </div>
           <div className="grid gap-3 md:grid-cols-2">
             <div>
               <label className=""> Linkedin Link ( Optional ): </label>
@@ -581,13 +608,14 @@ function Form() {
           {/* Button */}
           <div>
             <button
-              type="submit"
+              type="button"
+              onClick={handlsubmit}
               className="mt-5 w-full rounded-md bg-[#064675] p-2 text-center font-semibold text-white"
             >
               Get Started
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </>
   );

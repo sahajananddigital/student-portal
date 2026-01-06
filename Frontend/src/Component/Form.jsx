@@ -1,11 +1,20 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function Form() {
+  const navigate = useNavigate();
   const dropdownRef = useRef(null);
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
   const RAZOREPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY;
 
   const [error, seterror] = useState({});
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
+
+  // erorr msg
+  const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [isPaying, setIsPaying] = useState(false);
   const [form, setform] = useState({
     name: "",
     middlename: "",
@@ -177,21 +186,73 @@ function Form() {
 
   const handlsubmit = (e) => {
     e.preventDefault();
-    if (Object.keys(handlvalidate()).length > 0) return;
+
+    if (isPaying) return;
+    setIsPaying(true);
+
+    if (Object.keys(handlvalidate()).length > 0) {
+      setIsPaying(false);
+      return;
+    }
 
     const fees = parseInt(form.fees);
-    if (!fees || fees <= 0) return alert("Enter valid fees");
+    if (!fees || fees <= 0) {
+      setIsPaying(false);
+      setErrorMsg("Enter valid fees");
+      return;
+    }
 
-    // Open Razorpay popup
     const options = {
       key: RAZOREPAY_KEY, // your Razorpay key
       amount: Number(form.fees) * 100, // in paise
       currency: "INR",
       name: "Training Fees",
       description: "Pay your fees",
+
       handler: async function (response) {
-        if (!response.razorpay_payment_id) return alert("Payment failed");
-        submitfordata(response.razorpay_payment_id);
+        try {
+          setErrorMsg("");
+          setSuccessMsg("");
+
+          if (!response.razorpay_payment_id) {
+            setErrorMsg("Payment failed. Please try again.");
+            setIsPaying(false);
+            return;
+          }
+          await submitfordata(response.razorpay_payment_id);
+          setPaymentSuccess(true);
+          setform({
+            name: "",
+            middlename: "",
+            surname: "",
+            addressproof: "",
+            email: "",
+            phone: "",
+            education: "",
+            collegename: "",
+            enrolmentnumber: "",
+            birthdate: "",
+            resumefile: "",
+            interestedtechnology: "",
+            startdate: "",
+            enddate: "",
+            parentphone: "",
+            parentaddressproof: "",
+            fees: "",
+            agree: false,
+          });
+          setSuccessMsg("🎉 Payment successful! Your form has been submitted.");
+          setIsPaying(false);
+        } catch (error) {
+          console.error(error);
+          setErrorMsg("Something went wrong while saving data");
+          setIsPaying(false);
+        }
+      },
+      modal: {
+        ondismiss: function () {
+          setIsPaying(false);
+        },
       },
     };
 
@@ -212,9 +273,18 @@ function Form() {
         body: formData,
       }
     );
+    if (!res.ok) {
+      throw new Error("Backend submission failed");
+    }
     const data = await res.text();
     console.log(data);
   };
+
+  useEffect(() => {
+    if (paymentSuccess) {
+      navigate("/student-portal");
+    }
+  }, [paymentSuccess, navigate]);
 
   return (
     <>
@@ -222,7 +292,10 @@ function Form() {
         <h1 className="mb-6 text-xl text-center font-semibold lg:text-2xl">
           Register Form{" "}
         </h1>
-        <div className="relative border border-gray-100 space-y-4 max-w-screen-lg mx-auto rounded-md bg-white p-6 shadow-xl lg:p-10">
+        <form
+          onSubmit={handlsubmit}
+          className="relative border border-gray-100 space-y-4 max-w-screen-lg mx-auto rounded-md bg-white p-6 shadow-xl lg:p-10"
+        >
           {/* FirstName, LastName, MiddleName  */}
           <div className="grid gap-3 md:grid-cols-3">
             <div>
@@ -608,14 +681,27 @@ function Form() {
           {/* Button */}
           <div>
             <button
-              type="button"
-              onClick={handlsubmit}
-              className="mt-5 w-full rounded-md bg-[#064675] p-2 text-center font-semibold text-white"
+              type="submit"
+              disabled={isPaying}
+              className="mt-5 w-full rounded-md bg-[#054676] p-2 text-center font-semibold text-white"
             >
-              Get Started
+              {isPaying ? "Processing Payment..." : "Get Started"}
             </button>
+            {/* Success Message */}
+            {successMsg && (
+              <div className="rounded-md bg-green-100 border border-green-400 p-3 text-green-800 text-sm">
+                {successMsg}
+              </div>
+            )}
+
+            {/* Error Message */}
+            {errorMsg && (
+              <div className="rounded-md bg-red-100 border border-red-400 p-3 text-red-800 text-sm">
+                {errorMsg}
+              </div>
+            )}
           </div>
-        </div>
+        </form>
       </div>
     </>
   );

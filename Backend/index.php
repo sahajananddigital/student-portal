@@ -59,6 +59,14 @@ try {
     error_log("Payment Status: " . $payment->status);
     error_log("Payment Amount: " . $payment->amount);
 
+    if ($payment->status === 'authorized') {
+        $payment = $payment->capture([
+            'amount' => $fees * 100, // amount in paise
+            'currency' => 'INR'
+        ]);
+    }
+    error_log("Payment Status (after): " . $payment->status);
+
     if ($payment->status !== 'captured') {
         echo json_encode([
             'success' => false,

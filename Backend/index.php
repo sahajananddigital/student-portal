@@ -1,7 +1,7 @@
 <?php
 header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Origin: http://localhost:5173");
+header("Access-Control-Allow-Methods: POST, PUT, GET, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 $request = trim($_GET['action'] ?? '');
 
 switch ($request) {
-
+    // Authentication
     case "student-register":
         require __DIR__ . "/auth/student-register.php";
         break;
@@ -20,9 +20,14 @@ switch ($request) {
         require __DIR__ . "/auth/login.php";
         break;
 
+    // Student
     case "admin-students":
         require __DIR__ . "/middleware/adminAuth.php";
         require __DIR__ . "/Student/getStudents.php";
+        break;
+
+    case "update-students":
+        require __DIR__ . "/Student/updateStudent.php";
         break;
 
     case "create-admin":
@@ -33,6 +38,7 @@ switch ($request) {
         require __DIR__ . "/Student/profile.php";
         break;
 
+    // Attendance
     case "student-attendance":
         require __DIR__ . "/Student/attendance.php";
         break;

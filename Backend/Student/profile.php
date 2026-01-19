@@ -10,64 +10,92 @@ require_once __DIR__ . '/../config/db.php';
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
 
-// Load environment variables
-$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../'); // fixed path
+$dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
 $dotenv->safeLoad();
 
 try {
     $secretKey = $_ENV['JWT_SECRET_KEY'] ?? null;
-
     if (!$secretKey) {
-        throw new Exception("JWT_SECRET_KEY not set in .env");
+        throw new Exception("JWT_SECRET_KEY not set");
     }
 
-    // Get headers
     $headers = getallheaders();
-
-    if (!isset($headers['Authorization'])) {
+    if (empty($headers['Authorization'])) {
         throw new Exception("Authorization header missing");
     }
 
-    // Extract token from header
     if (!preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $matches)) {
-        throw new Exception("Bearer token not found");
+        throw new Exception("Invalid Bearer token");
     }
 
     $token = $matches[1];
-
-    // Decode JWT
     $decoded = JWT::decode($token, new Key($secretKey, 'HS256'));
-    $userId = $decoded->sub ?? null;
 
+    $userId = $decoded->sub ?? null;
     if (!$userId) {
-        throw new Exception("Invalid token: user ID not found");
+        throw new Exception("Invalid token payload");
     }
 
-    // Fetch user data
     $stmt = $conn->prepare("
-        SELECT u.id AS user_id, u.email, u.role, s.*
-        FROM users AS u
-        LEFT JOIN students AS s ON u.id = s.user_id
-        WHERE u.id = :id
-        LIMIT 1
-    ");
+    SELECT 
+        u.id AS user_id,
+        u.email,
+        u.role,
+        s.id AS student_table_id,
+        s.name,
+        s.middlename,
+        s.surname,
+        s.phone,
+        s.birthdate,
+        s.education,
+        s.collegename,
+        s.enrolmentnumber,
+        s.interestedtechnology,
+        s.startdate,
+        s.enddate,
+        s.linkedin,
+        s.github,
+        s.parentphone,
+        s.parentemail,
+        s.parentaddressproof,
+        s.fees
+    FROM users u
+    LEFT JOIN students s ON u.id = s.user_id
+    WHERE u.id = :id
+    LIMIT 1
+");
     $stmt->execute([':id' => $userId]);
     $data = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if (!$data) {
-        throw new Exception("User not found");
-    }
 
     echo json_encode([
         "status" => "success",
         "user" => [
             "id" => $data['user_id'],
             "email" => $data['email'],
-            "role" => $data['role'],
-            "password" => $data['role']
+            "role" => $data['role']
         ],
-        "student" => $data['role'] === 'student' ? $data : null
+        "student" => $data['student_table_id'] ? [
+            "name" => $data['name'],
+            "middlename" => $data['middlename'],
+            "surname" => $data['surname'],
+            "student_id" => $data['enrolmentnumber'],
+            "phone" => $data['phone'],
+            "dob" => $data['birthdate'],
+            "major" => $data['interestedtechnology'],
+            "education" => $data['education'],
+            "college" => $data['collegename'],
+            "enrolmentnumber" => $data['enrolmentnumber'],
+            "start_date" => $data['startdate'],
+            "end_date" => $data['enddate'],
+            "linkedin" => $data['linkedin'],
+            "github" => $data['github'],
+            "parent_phone" => $data['parentphone'],
+            "parent_email" => $data['parentemail'],
+            "parentaddressproof" => $data['parentaddressproof'],
+            "fees" => $data['fees']
+        ] : null
     ]);
+
 
 } catch (Exception $e) {
     http_response_code(401);

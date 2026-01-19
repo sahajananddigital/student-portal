@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
   User,
   Mail,
@@ -70,6 +70,34 @@ const InfoRow = ({ label, value, icon: Icon }) => (
 );
 
 export default function Account() {
+  const [profile, setProfile] = useState({});
+
+  const BACKEND_PORT = import.meta.env.VITE_LOCAL_BACKEND_PORT;
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    fetch(`${BACKEND_PORT}?action=student-profile`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch {
+          return {
+            status: "error",
+            message: "Invalid JSON response",
+            raw: text,
+          };
+        }
+      })
+      .then((data) => {
+        console.log("Profile response:", data);
+        if (data.status === "success") setProfile(data.student || {});
+      })
+      .catch((err) => console.log("Fetch error:", err));
+  }, [BACKEND_PORT]);
+
   return (
     <div className=" bg-slate-50 font-sans text-slate-900 pb-12">
       {/* Top Banner & Profile Header */}

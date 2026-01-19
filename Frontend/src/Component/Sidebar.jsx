@@ -11,6 +11,9 @@ import { Link } from "react-router-dom";
 function Sidebar() {
   const [open, setOpen] = useState(false);
 
+  const handleSignOut = () => {
+    localStorage.removeItem("token");
+  };
   return (
     <>
       {/* Mobile Toggle */}
@@ -46,11 +49,7 @@ function Sidebar() {
         <div className="flex flex-col h-full px-4 py-6">
           {/* Top Menu */}
           <div className="space-y-2">
-            <SidebarItem
-              title="Dashboard"
-              icon={dashboard}
-              to="/student-portal"
-            />
+            <SidebarItem title="Dashboard" icon={dashboard} to="/home" />
             <SidebarItem
               title="Attendance"
               icon={attendance}
@@ -75,7 +74,13 @@ function Sidebar() {
             <SidebarItem title="Account Setting" icon={setting} to="/account" />
 
             {/* Sign Out */}
-            <SidebarItem title="Sign Out" danger icon={signout} />
+            <SidebarItem
+              title="Sign Out"
+              danger
+              icon={signout}
+              onClick={handleSignOut}
+              to={"/"}
+            />
           </div>
         </div>
       </aside>
@@ -83,7 +88,7 @@ function Sidebar() {
   );
 }
 
-function SidebarItem({ title, danger, icon, to }) {
+function SidebarItem({ title, danger, icon, to, onClick }) {
   return (
     <Link
       className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition
@@ -93,6 +98,7 @@ function SidebarItem({ title, danger, icon, to }) {
           : "text-white hover:bg-white/10"
       }`}
       to={to}
+      onClick={onClick}
     >
       <img src={icon} alt={title} className="w-5 h-5" />
       <span className="text-sm font-medium">{title}</span>

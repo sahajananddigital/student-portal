@@ -16,14 +16,17 @@ import {
   AlertCircle,
   ArrowRight,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function RegisterForm() {
+  const navigate = useNavigate();
   const brandColor = "#054676";
   const dropdownRef = useRef(null);
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
   // Use empty string as fallback for env variable per environment instructions
   const RAZORPAY_KEY = import.meta.env.VITE_RAZORPAY_KEY;
+  const BACKEND_PORT = import.meta.env.VITE_LOCAL_BACKEND_PORT;
 
   // Form State
   const [form, setForm] = useState({
@@ -32,6 +35,7 @@ export default function RegisterForm() {
     surname: "",
     email: "",
     phone: "",
+    password: "",
     education: "",
     collegename: "",
     enrolmentnumber: "",
@@ -101,6 +105,12 @@ export default function RegisterForm() {
       errs.name = "Name is required";
     } else if (form.name.trim().length < 3) {
       errs.name = "Name must be at least 3 characters long";
+    }
+
+    if (!form.password.trim()) {
+      errs.password = "Password is required";
+    } else if (form.password.trim().length < 8) {
+      errs.password = "Password must be at least 8 characters long";
     }
 
     if (!form.middlename.trim()) {
@@ -202,18 +212,23 @@ export default function RegisterForm() {
     });
     formData.append("razorpay_payment_id", paymentId);
 
-    const res = await fetch(
-      "http://localhost:8080/student-portal/Backend/index.php",
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
+    const res = await fetch(`${BACKEND_PORT}?action=student-register`, {
+      method: "POST",
+      body: formData,
+    });
 
     if (!res.ok) {
       throw new Error("Backend submission failed");
     }
-    return await res.text();
+    const data = await res.json();
+
+    if (data.status === "success" && data.token) {
+      // Store token in localStorage
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+    }
+
+    return data;
   };
 
   const handleSubmit = (e) => {
@@ -243,7 +258,7 @@ export default function RegisterForm() {
       key: RAZORPAY_KEY,
       amount: feesAmount * 100, // in paise
       currency: "INR",
-      name: "Attendify Training",
+      name: "Shiksha Skills Institute",
       description: `Fees for ${form.interestedtechnology}`,
       handler: async function (response) {
         try {
@@ -252,8 +267,15 @@ export default function RegisterForm() {
             setIsPaying(false);
             return;
           }
+          const data = await submitToBackend(response.razorpay_payment_id);
 
-          await submitToBackend(response.razorpay_payment_id);
+          if (data.status !== "success") {
+            setErrorMsg(
+              data.message || "Something went wrong while saving data",
+            );
+            setIsPaying(false);
+            return;
+          }
 
           setPaymentSuccess(true);
           setSuccessMsg("🎉 Payment successful! Your form has been submitted.");
@@ -285,7 +307,7 @@ export default function RegisterForm() {
           });
           setIsPaying(false);
         } catch (err) {
-          console.error(err);
+          console.error("api error", err);
           setErrorMsg("Something went wrong while saving data");
           setIsPaying(false);
         }
@@ -306,32 +328,37 @@ export default function RegisterForm() {
       setIsPaying(false);
     }
   };
-
+  useEffect(() => {
+    if (paymentSuccess) {
+      navigate("/home");
+    }
+  }, [paymentSuccess, navigate]);
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 py-10 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header Section */}
-        <div className="text-center mb-10">
-          <div
-            className="inline-flex items-center justify-center w-16 h-16 rounded-2xl shadow-xl mb-4 text-white"
-            style={{ backgroundColor: brandColor }}
-          >
-            <ShieldCheck className="w-10 h-10" />
+      <div className="max-w-5xl mx-auto">
+        <div className="relative pb-8 px-8 text-center">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#054676] text-white mb-6 ring-4 ring-[#054676]/50">
+            <GraduationCap size={32} strokeWidth={2.5} />
           </div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">
-            Register with Attendify
+          j
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 leading-tight">
+            Shiksha Skills <span className="text-[#054676]">Institute</span>
           </h1>
-          <p className="text-slate-500 mt-2 font-medium italic">
-            Empowering your academic journey
-          </p>
+          <div className="mt-4 flex items-center justify-center gap-2">
+            <div className="h-px w-8 bg-slate-200"></div>
+            <span className="px-3 py-1 rounded-full bg-slate-100 text-[11px] font-bold uppercase tracking-widest text-slate-500 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+              Registration Portal
+            </span>
+            <div className="h-px w-8 bg-slate-200"></div>
+          </div>
         </div>
 
         <form
           onSubmit={handleSubmit}
-          className="bg-white rounded-3xl shadow-2xl shadow-slate-200/60 border border-slate-100 overflow-hidden"
+          className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 border border-slate-100 overflow-hidden"
         >
           <div className="p-8 lg:p-10 space-y-8">
-            {/* Section 1: Personal Details */}
             <div>
               <h3 className="text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-6 flex items-center gap-2">
                 <User className="w-4 h-4" /> Personal Information
@@ -393,7 +420,7 @@ export default function RegisterForm() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
                 <div>
                   <label className="text-xs font-bold text-slate-500 uppercase mb-2 block ml-1">
                     Email Address
@@ -409,6 +436,24 @@ export default function RegisterForm() {
                   {error.email && (
                     <span className="text-rose-500 text-[10px] font-bold mt-1 ml-1">
                       {error.email}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block ml-1">
+                    Password
+                  </label>
+                  <input
+                    type="password"
+                    name="password"
+                    value={form.password}
+                    onChange={handleChanges}
+                    placeholder="Password"
+                    className="w-full h-12 rounded-xl bg-slate-50 border border-slate-100 px-4 focus:bg-white outline-none text-sm font-medium"
+                  />
+                  {error.password && (
+                    <span className="text-rose-500 text-[10px] font-bold mt-1 ml-1">
+                      {error.password}
                     </span>
                   )}
                 </div>
@@ -842,7 +887,7 @@ export default function RegisterForm() {
         </form>
 
         <p className="text-center mt-10 text-[10px] text-slate-400 font-bold uppercase tracking-[0.3em]">
-          Secured Enrollment Portal • © 2024 Attendify
+          Secured Enrollment Portal • © 2026 Shiksha Skills Institute
         </p>
       </div>
     </div>

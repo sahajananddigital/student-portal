@@ -1,265 +1,422 @@
 import React, { useState, useEffect } from "react";
-import { MapPin, Clock, CheckCircle, BookOpen, ArrowLeft } from "lucide-react";
+import {
+  Calendar,
+  MapPin,
+  LogOut,
+  Loader2,
+  Clock,
+  History,
+  TrendingUp,
+  Award,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 
-// Mock course data
-const COURSES = [
-  { id: 1, name: "Advanced Web Development", code: "CS402", room: "Lab 404" },
-  { id: 2, name: "Database Systems", code: "CS305", room: "Hall A" },
-  { id: 3, name: "Machine Learning", code: "CS408", room: "Room 202" },
-];
+const Attendance = () => {
+  const THEME_COLOR = "#054676";
+  const API_BASE_URL = import.meta.env.VITE_LOCAL_BACKEND_PORT;
 
-export default function Attendance() {
+  const [attendanceStatus, setAttendanceStatus] = useState("idle");
+  const [startTime, setStartTime] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [attendanceStatus, setAttendanceStatus] = useState("idle"); // 'idle', 'checked-in', 'finished'
-  const [log, setLog] = useState({
-    checkIn: null,
-    checkOut: null,
-    checkInRaw: null,
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState("00:00:00");
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
-  // Update clock every second
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const recordsPerPage = 4;
+
+  const totalDaysPresent = history.length;
+
+  const totalSeconds = history.reduce(
+    (acc, curr) => acc + curr.rawDurationSeconds,
+    0,
+  );
+  const totalHours = Math.floor(totalSeconds / 3600);
+  const totalMinutes = Math.floor((totalSeconds % 3600) / 60);
+  const formattedTotalTime = `${totalHours}h ${totalMinutes}m`;
+
+  const averageHours =
+    totalDaysPresent > 0 ? (totalHours / totalDaysPresent).toFixed(1) : 0;
+
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  const handleCheckIn = () => {
-    const now = new Date();
-    setLog({
-      ...log,
-      checkIn: now.toLocaleTimeString(),
-      checkInRaw: now, // Store raw date for duration calculation later
+  useEffect(() => {
+    let interval;
+    if (attendanceStatus === "active" && startTime) {
+      interval = setInterval(() => {
+        const now = new Date();
+        const diff = Math.floor((now - startTime) / 1000);
+        const hrs = Math.floor(diff / 3600)
+          .toString()
+          .padStart(2, "0");
+        const mins = Math.floor((diff % 3600) / 60)
+          .toString()
+          .padStart(2, "0");
+        const secs = (diff % 60).toString().padStart(2, "0");
+        setElapsedTime(`${hrs}:${mins}:${secs}`);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [attendanceStatus, startTime]);
+
+  const fetchAttendanceHistory = async (page = 1) => {
+    setHistoryLoading(true);
+
+    try {
+      const student = JSON.parse(localStorage.getItem("student") || "{}");
+      const studentId = student.id || 1;
+
+      const response = await fetch(
+        `${API_BASE_URL}?action=get-attendance&studentId=${studentId}&page=${page}&limit=${recordsPerPage}`,
+      );
+
+      const data = await response.json();
+
+      if (data.status === "success") {
+        setHistory(data.data);
+        setCurrentPage(data.pagination.currentPage);
+        setTotalPages(data.pagination.totalPages);
+        setTotalRecords(data.pagination.totalRecords);
+      }
+    } catch (err) {
+      console.error("Attendance fetch failed", err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendanceHistory(1);
+  }, []);
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      fetchAttendanceHistory(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      fetchAttendanceHistory(currentPage + 1);
+    }
+  };
+
+  const getGreeting = () => {
+    const hour = currentTime.getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 18) return "Good Afternoon";
+    return "Good Evening";
+  };
+
+  const formatTime = (date) => {
+    return date.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
     });
-    setAttendanceStatus("checked-in");
+  };
+
+  const handleCheckIn = () => {
+    setStartTime(new Date());
+    setAttendanceStatus("active");
   };
 
   const handleCheckOut = async () => {
-    setIsSubmitting(true);
-    const now = new Date();
-    const checkOutTimeStr = now.toLocaleTimeString();
-
-    // Calculate duration in minutes
-    const durationMs = now - log.checkInRaw;
-    const durationMinutes = Math.floor(durationMs / 60000);
-
-    // Prepare data for API
-    const payload = {
-      studentId: "STUDENT_ID_HERE", // Replace with actual student context
-      courseId: selectedCourse.id,
-      courseName: selectedCourse.name,
-      courseCode: selectedCourse.code,
-      startTime: log.checkIn,
-      endTime: checkOutTimeStr,
-      durationMinutes: durationMinutes,
-    };
+    setLoading(true);
 
     try {
-      // REPLACE WITH YOUR ACTUAL API ENDPOINT
+      const endTime = new Date();
+      const studentData = JSON.parse(localStorage.getItem("student") || "{}");
+      const studentId = studentData.id || 1;
+
       const response = await fetch(
-        "https://api.example.com/attendance/submit",
+        `${API_BASE_URL}?action=student-attendance`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(payload),
-        }
+          body: JSON.stringify({
+            studentId: studentId,
+            startTime: formatTime(startTime),
+            endTime: formatTime(endTime),
+            date: startTime.toISOString().split("T")[0],
+          }),
+        },
       );
 
-      if (response.ok) {
-        setLog((prev) => ({ ...prev, checkOut: checkOutTimeStr }));
-        setAttendanceStatus("finished");
+      const data = await response.json();
+
+      if (data.status === "success") {
+        await fetchAttendanceHistory(1);
+        setCurrentPage(1);
+        setShowSuccessToast(true);
+        setTimeout(() => setShowSuccessToast(false), 3000);
       } else {
-        alert("Failed to submit attendance. Please try again.");
+        console.error("Failed to save attendance:", data.error);
       }
     } catch (error) {
-      console.error("Submission error:", error);
-      alert("Network error occurred.");
+      console.error("Error saving attendance:", error);
     } finally {
-      setIsSubmitting(false);
+      setAttendanceStatus("idle");
+      setLoading(false);
+      setElapsedTime("00:00:00");
+      setStartTime(null);
     }
   };
 
-  const resetSession = () => {
-    setSelectedCourse(null);
-    setAttendanceStatus("idle");
-    setLog({ checkIn: null, checkOut: null, checkInRaw: null });
-  };
-
   return (
-    <div className="font-sans text-slate-900 p-4 sm:p-6">
-      <div className="max-w-md mx-auto space-y-6">
-        {/* Header Clock Section */}
-        <div className="relative rounded-2xl h-40 bg-gradient-to-r from-[#054676] to-[#1e6bb8] overflow-hidden">
-          <div className="absolute inset-0 opacity-15 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:20px_20px]" />
-          <div className="relative z-10 h-full flex flex-col items-center justify-center text-center">
-            <p className="text-indigo-100 text-sm font-medium uppercase tracking-widest mb-2">
-              Current Session
+    <div className="min-h-screen bg-slate-100 flex items-center justify-center font-sans text-slate-800">
+      <div className="w-full max-w-6xl bg-white rounded-2xl  shadow-xl overflow-hidden border border-slate-200 flex flex-col lg:flex-row min-h-[600px]">
+        <div className="flex-1 flex flex-col relative border-r border-slate-100">
+          <div
+            className="h-2 w-full absolute top-0 left-0"
+            style={{ backgroundColor: THEME_COLOR }}
+          ></div>
+          <div className="p-8 pb-0">
+            <p className="text-slate-400 text-sm font-medium mb-1 uppercase tracking-wider">
+              {getGreeting()}
             </p>
-            <h2 className="text-4xl font-mono font-bold text-white mb-1">
-              {currentTime.toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-              })}
-            </h2>
-
-            <p className="text-indigo-100 text-sm">
-              {currentTime.toLocaleDateString(undefined, {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-              })}
-            </p>
+            <h1 className="text-3xl font-bold text-slate-900">
+              Mark Attendance
+            </h1>
+            <div className="mt-6 flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
+              <div className="bg-white p-3 rounded-xl shadow-sm text-blue-600">
+                <Calendar className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 font-bold uppercase">
+                  Today's Date
+                </p>
+                <p className="text-lg font-bold text-slate-700">
+                  {currentTime.toLocaleDateString("en-US", {
+                    weekday: "long",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </p>
+              </div>
+              <div className="ml-auto font-mono font-bold text-xl text-slate-800">
+                {currentTime.toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </div>
+            </div>
           </div>
+
+          <div className="flex-1 flex flex-col items-center justify-center p-8">
+            {attendanceStatus === "idle" ? (
+              <div className="flex flex-col items-center animate-in zoom-in duration-300">
+                <button
+                  onClick={handleCheckIn}
+                  className="group relative w-56 h-56 rounded-full flex flex-col items-center justify-center shadow-2xl transition-all hover:scale-105 active:scale-95 hover:shadow-blue-900/20"
+                  style={{ backgroundColor: THEME_COLOR }}
+                >
+                  <div className="absolute inset-0 rounded-full border-4 border-white opacity-20 group-hover:scale-110 transition-transform duration-500"></div>
+                  <MapPin className="w-12 h-12 text-white mb-3" />
+                  <span className="text-white font-bold text-2xl tracking-wide">
+                    CHECK IN
+                  </span>
+                  <span className="text-blue-200 text-sm mt-1 font-medium">
+                    Start Day
+                  </span>
+                </button>
+                <p className="mt-8 text-slate-400 font-medium">
+                  Tap above to start your shift
+                </p>
+              </div>
+            ) : (
+              <div className="w-full max-w-sm flex flex-col items-center animate-in zoom-in duration-300">
+                <div className="mb-10 text-center">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-green-50 text-green-700 text-sm font-bold uppercase tracking-wide border border-green-100 mb-6 animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                    Active Session
+                  </div>
+                  <div className="text-6xl font-mono font-bold text-slate-900 tracking-tight">
+                    {elapsedTime}
+                  </div>
+                  <p className="text-slate-400 mt-2 font-medium">
+                    Started at {formatTime(startTime)}
+                  </p>
+                </div>
+
+                <button
+                  onClick={handleCheckOut}
+                  disabled={loading}
+                  className={`w-full py-6 rounded-2xl flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg ${
+                    loading
+                      ? "bg-slate-100 cursor-not-allowed"
+                      : "bg-red-50 hover:bg-red-100 text-red-600 border border-red-100"
+                  }`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                      <span className="text-slate-500 font-bold">
+                        Syncing...
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <LogOut className="w-6 h-6" />
+                      <span className="font-bold text-xl">CHECK OUT</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Success Toast Overlay */}
+          {showSuccessToast && (
+            <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-bottom-4">
+              <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                <span className="text-xs font-bold">✓</span>
+              </div>
+              <span className="font-medium">
+                Attendance Logged Successfully
+              </span>
+            </div>
+          )}
         </div>
 
-        {/* Step 1: Select Subject */}
-        {!selectedCourse && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-5 border-b border-slate-50 flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-[#054676] " />
-              <h3 className="font-bold text-slate-800">Select Subject</h3>
+        <div className="flex-1 bg-slate-50 p-8 flex flex-col overflow-hidden">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+            {/* Days Present */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center gap-2">
+              <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                <TrendingUp className="w-6 h-6" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900">
+                {totalDaysPresent}
+              </p>
+              <p className="text-xs font-medium text-slate-400">Days Present</p>
             </div>
-            <div className="p-2">
-              {COURSES.map((course) => (
-                <button
-                  key={course.id}
-                  onClick={() => setSelectedCourse(course)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-indigo-50 rounded-xl transition-colors group"
-                >
-                  <div className="text-left">
-                    <p className="font-bold text-slate-800 group-hover:text-[#054676]">
-                      {course.name}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {course.code} • {course.room}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-slate-100 text-slate-400 rounded-lg group-hover:bg-[#054676] group-hover:text-white">
-                    <ArrowLeft className="w-4 h-4 rotate-180" />
-                  </div>
-                </button>
-              ))}
+
+            {/* Total Hours */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center gap-2">
+              <div className="p-3 bg-orange-50 text-orange-600 rounded-xl">
+                <Clock className="w-6 h-6" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900">
+                {formattedTotalTime}
+              </p>
+              <p className="text-xs font-medium text-slate-400">Total Hours</p>
+            </div>
+
+            {/* Avg Hours */}
+            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center gap-2">
+              <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+                <Award className="w-6 h-6" />
+              </div>
+              <p className="text-2xl font-bold text-slate-900">
+                {averageHours}
+                <span className="text-sm font-medium text-slate-400"> Hrs</span>
+              </p>
+              <p className="text-xs font-medium text-slate-400">
+                Avg. Hours / Day
+              </p>
             </div>
           </div>
-        )}
 
-        {/* Step 2 & 3: Check-in / Check-out */}
-        {selectedCourse && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 space-y-6">
-              {/* Back Button (Only if not checked in) */}
-              {attendanceStatus === "idle" && (
-                <button
-                  onClick={() => setSelectedCourse(null)}
-                  className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#054676] transition-colors"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                  Change Subject
-                </button>
-              )}
+          {/* Recent History List */}
+          <div className="flex-1 flex flex-col min-h-0">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-slate-700 flex items-center gap-2">
+                <History className="w-4 h-4 text-slate-400" />
+                Recent History
+              </h3>
+              <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">
+                {totalRecords} Records
+              </span>
+            </div>
 
-              {/* Class Info Card */}
-              <div className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
-                <div className="p-2 bg-[#054676] text-white rounded-lg">
-                  <Clock className="w-5 h-5" />
+            <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+              {historyLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-8 h-8 animate-spin text-slate-400" />
                 </div>
-                <div>
-                  <p className="text-xs text-slate-500 font-semibold uppercase">
-                    Active Subject
-                  </p>
-                  <h4 className="font-bold text-slate-800 leading-tight">
-                    {selectedCourse.name}
-                  </h4>
-                  <p className="text-sm text-slate-600">
-                    {selectedCourse.code} • {selectedCourse.room}
-                  </p>
+              ) : history.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                  <Calendar className="w-12 h-12 mb-3 opacity-50" />
+                  <p className="font-medium">No attendance records yet</p>
                 </div>
-              </div>
-
-              {/* Interaction Logic */}
-              <div className="pt-2">
-                {attendanceStatus === "idle" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 text-sm text-emerald-600 font-medium justify-center">
-                      <MapPin className="w-4 h-4" />
-                      <span>Verified: Within Campus Range</span>
-                    </div>
-                    <button
-                      onClick={handleCheckIn}
-                      className="w-full bg-[#054676] hover:bg-[#054676] text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-indigo-200 active:scale-95"
-                    >
-                      Mark Attendance
-                    </button>
-                  </div>
-                )}
-
-                {attendanceStatus === "checked-in" && (
-                  <div className="space-y-6 text-center">
-                    <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold animate-pulse">
-                      <span className="w-2 h-2 bg-emerald-500 rounded-full"></span>
-                      Session In Progress
-                    </div>
-                    <p className="text-sm text-slate-500">
-                      Checked in at{" "}
-                      <span className="font-bold text-slate-800">
-                        {log.checkIn}
-                      </span>
-                    </p>
-                    <button
-                      onClick={handleCheckOut}
-                      disabled={isSubmitting}
-                      className={`w-full ${
-                        isSubmitting
-                          ? "bg-slate-400"
-                          : "bg-rose-500 hover:bg-rose-600"
-                      } text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-rose-100 active:scale-95`}
-                    >
-                      {isSubmitting ? "Syncing..." : "End Attendance"}
-                    </button>
-                  </div>
-                )}
-
-                {attendanceStatus === "finished" && (
-                  <div className="space-y-6 py-4 text-center">
-                    <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle className="w-12 h-12 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-slate-800">
-                        Session Completed
-                      </h3>
-                      <div className="mt-4 space-y-1 text-sm text-slate-500 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                        <p>
-                          Check-in:{" "}
-                          <span className="font-semibold text-slate-700">
-                            {log.checkIn}
-                          </span>
+              ) : (
+                history.map((record) => (
+                  <div
+                    key={record.id}
+                    className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow flex items-center justify-between group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-blue-50 group-hover:text-blue-600 transition-colors">
+                        {record.date.split(",")[0].substring(0, 3)}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">
+                          {record.date}
                         </p>
-                        <p>
-                          Check-out:{" "}
-                          <span className="font-semibold text-slate-700">
-                            {log.checkOut}
-                          </span>
+                        <p className="text-xs text-slate-400 font-medium">
+                          {record.checkIn} - {record.checkOut}
                         </p>
                       </div>
                     </div>
-                    <button
-                      onClick={resetSession}
-                      className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-4 rounded-xl transition-all"
-                    >
-                      Close & Return
-                    </button>
+                    <div className="text-right">
+                      <span className="inline-block px-3 py-1 rounded-lg bg-slate-50 text-slate-600 text-xs font-bold border border-slate-100">
+                        {record.duration}
+                      </span>
+                    </div>
                   </div>
-                )}
-              </div>
+                ))
+              )}
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 1 || historyLoading}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === 1 || historyLoading
+                      ? "text-slate-300 cursor-not-allowed"
+                      : "text-slate-600 hover:bg-white hover:shadow-sm"
+                  }`}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                  Prev
+                </button>
+                <span className="text-sm font-medium text-slate-500">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages || historyLoading}
+                  className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === totalPages || historyLoading
+                      ? "text-slate-300 cursor-not-allowed"
+                      : "text-slate-600 hover:bg-white hover:shadow-sm"
+                  }`}
+                >
+                  Next
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default Attendance;

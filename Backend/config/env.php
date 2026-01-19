@@ -1,14 +1,7 @@
 <?php
-$envfile = __DIR__ . '/../.env';
+require_once __DIR__ . "/../vendor/autoload.php";
 
-if (!file_exists($envfile)) {
-    die('.env file not found');
-}
-$lines = file($envfile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+use Dotenv\Dotenv;
 
-foreach ($lines as $line) {
-    if (str_starts_with(trim($line), '#'))
-        continue;
-    list($key, $value) = explode('=', $line, 2);
-    $_ENV[trim($key)] = trim($value);
-}
+$dotenv = Dotenv::createImmutable(__DIR__ . "/..");
+$dotenv->load();

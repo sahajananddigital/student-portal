@@ -1,6 +1,5 @@
 import React from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
-import Form from "./Component/Form";
 import StudentPortal from "./Page/StudentPortal";
 import StudentLayout from "./Layout/StudentLayout";
 import Attendance from "./Page/Attendance";
@@ -16,11 +15,11 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route index path="/" element={<SignIn />} />
-        <Route path="/signup" element={<Form />} />
-        <Route path="/RegisterForm" element={<RegisterForm />} />
+        <Route path="/signup" element={<RegisterForm />} />
 
+        {/* Admin Panel */}
         <Route element={<StudentLayout />}>
-          <Route index path="/student-portal" element={<StudentPortal />} />
+          <Route index path="/home" element={<StudentPortal />} />
           <Route index path="/attendance" element={<Attendance />} />
           <Route index path="/task" element={<Task />} />
           <Route index path="/certificate" element={<Certificate />} />

@@ -3,7 +3,7 @@ header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json");
 
-require __DIR__ . "/../config/db.php"; // This provides $conn
+require __DIR__ . "/../config/db.php";
 
 $data = json_decode(file_get_contents("php://input"), true);
 
@@ -15,7 +15,6 @@ if (!$data) {
 $certificateId = "CERT-" . time();
 
 try {
-    // ✅ CHANGED: Used $conn instead of $pdo
     $stmt = $conn->prepare("
             INSERT INTO certificates 
             (certificate_id, full_name, position, start_date, end_date, issue_date)

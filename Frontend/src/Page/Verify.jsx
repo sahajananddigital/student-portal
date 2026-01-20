@@ -2,11 +2,12 @@ import { useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 
 const Verify = () => {
+  const BACKEND_PORT = import.meta.env.VITE_LOCAL_BACKEND_PORT;
   const { id } = useParams();
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    fetch(`http://localhost/api/verify-certificate.php?id=${id}`)
+    fetch(`${BACKEND_PORT}?action=verify-certificate?id=${id}`)
       .then((res) => res.json())
       .then(setData);
   }, [id]);

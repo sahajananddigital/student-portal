@@ -5,6 +5,7 @@ import QRCode from "qrcode";
 
 const Certificate = () => {
   const BACKRND = import.meta.env.VITE_LOCAL_BACKEND_PORT;
+  const FRONTEND = import.meta.env.VITE_LOCAL_FRONTEND_PORT;
 
   const canvasRef = useRef(null);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -161,9 +162,7 @@ const Certificate = () => {
     };
 
     const qrUrl = await QRCode.toDataURL(
-      `http://localhost:5173/verify?data=${encodeURIComponent(
-        JSON.stringify(qrData),
-      )}`,
+      `${FRONTEND}/verify?data=${encodeURIComponent(JSON.stringify(qrData))}`,
     );
 
     const qrImg = new Image();
@@ -171,7 +170,6 @@ const Certificate = () => {
     await new Promise((res) => (qrImg.onload = res));
 
     ctx.drawImage(qrImg, 720, 860, 150, 150);
-
     ctx.textAlign = "center";
     ctx.font = "12px Arial";
     ctx.fillStyle = "#555";

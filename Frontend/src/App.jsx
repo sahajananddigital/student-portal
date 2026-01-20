@@ -8,6 +8,7 @@ import Certificate from "./Page/Certificate";
 import OfferLetter from "./Page/offerLetter";
 import Account from "./Page/Account";
 import SignIn from "./Page/Signin";
+import Verify from "./Page/Verify";
 import RegisterForm from "./Component/RegisterForm";
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
           <Route index path="/certificate" element={<Certificate />} />
           <Route index path="/offer-letter" element={<OfferLetter />} />
           <Route index path="/account" element={<Account />} />
+          <Route index path="/verify" element={<Verify />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -47,6 +47,15 @@ switch ($request) {
         require __DIR__ . "/Student/getAttendance.php";
         break;
 
+    // Certificate
+    case "issue-certificate":
+        require __DIR__ . "/Certificate/issue_certificate.php";
+        break;
+
+    case "verificate-certificate":
+        require __DIR__ . "/Certificate/verify_certificate.php";
+        break;
+
     default:
         http_response_code(404);
         echo json_encode([

@@ -1,8 +1,14 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Content-Type: application/json");
-header("Access-Control-Allow-Methods: POST, PUT, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+$allowed_origins = ['http://localhost:5173', 'https://shikshaskills.gt.tc'];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+if (in_array($origin, $allowed_origins)) {
+    header("Access-Control-Allow-Origin: $origin");
+    header("Access-Control-Allow-Credentials: true");
+}
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
@@ -31,7 +37,7 @@ switch ($request) {
 
     // Student
     case "admin-students":
-        require __DIR__ . "/middleware/adminAuth.php";
+        require __DIR__ . "/utils/Middleware/adminauth.php";
         require __DIR__ . "/Student/getStudents.php";
         break;
 
@@ -64,6 +70,21 @@ switch ($request) {
     case "verificate-certificate":
         require __DIR__ . "/Certificate/verify_certificate.php";
         break;
+
+    // Task
+    case "create-task":
+        require __DIR__ . "/Task/create_task.php";
+        break;
+
+    case "get-tasks":
+        require __DIR__ . "/Task/getTasks.php";
+        break;
+
+    // Dropdown
+    case "get-dropdown-students":
+        require __DIR__ . "/Task/getdropdownstuden.php";
+        break;
+
 
     default:
         http_response_code(404);

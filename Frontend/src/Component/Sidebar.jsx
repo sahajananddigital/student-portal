@@ -6,14 +6,28 @@ import certificate from "../assets/Admin/certificate.svg";
 import offerLetter from "../assets/Admin/offerletter.svg";
 import setting from "../assets/Admin/setting.svg";
 import signout from "../assets/Admin/signout.svg";
-import { Link } from "react-router-dom";
+import { Link, Navigate, Outlet } from "react-router-dom";
+import { jwtDecode } from "jwt-decode";
 
 function Sidebar() {
+  const token = localStorage.getItem("token");
   const [open, setOpen] = useState(false);
+
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+  let role = null;
+  try {
+    const decoded = jwtDecode(token);
+    role = decoded.role;
+  } catch (error) {
+    console.error("Invalid token:", error);
+  }
 
   const handleSignOut = () => {
     localStorage.removeItem("token");
   };
+
   return (
     <>
       {/* Mobile Toggle */}
@@ -61,11 +75,13 @@ function Sidebar() {
               icon={certificate}
               to="/certificate"
             />
-            <SidebarItem
-              title="Offer Letter"
-              icon={offerLetter}
-              to="/offer-letter"
-            />
+            {role === "admin" && (
+              <SidebarItem
+                title="Offer Letter"
+                icon={offerLetter}
+                to="/offer-letter"
+              />
+            )}
           </div>
 
           {/* Push bottom */}

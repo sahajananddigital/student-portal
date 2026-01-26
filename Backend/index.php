@@ -1,14 +1,29 @@
 <?php
-header("Content-Type: application/json");
-header("Access-Control-Allow-Origin: http://localhost:5173");
-header("Access-Control-Allow-Methods: POST, PUT, GET, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
+
+$allowed_origins = ['http://localhost:5173', 'https://shikshaskills.gt.tc'];
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+if (in_array($origin, $allowed_origins)) {
+    header("Access-Control-Allow-Origin: $origin");
+    header("Access-Control-Allow-Credentials: true");
+}
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(200);
     exit();
 }
+
 $request = trim($_GET['action'] ?? '');
+
+if (!isset($_GET['action'])) {
+    echo json_encode([
+        "status" => "ok",
+        "message" => "Hello from server Backend is alive"
+    ]);
+    exit;
+}
 
 switch ($request) {
     // Authentication
@@ -22,7 +37,7 @@ switch ($request) {
 
     // Student
     case "admin-students":
-        require __DIR__ . "/middleware/adminAuth.php";
+        require __DIR__ . "/utils/Middleware/adminauth.php";
         require __DIR__ . "/Student/getStudents.php";
         break;
 
@@ -46,6 +61,30 @@ switch ($request) {
     case "get-attendance":
         require __DIR__ . "/Student/getAttendance.php";
         break;
+
+    // Certificate
+    case "issue-certificate":
+        require __DIR__ . "/Certificate/issue_certificate.php";
+        break;
+
+    case "verificate-certificate":
+        require __DIR__ . "/Certificate/verify_certificate.php";
+        break;
+
+    // Task
+    case "create-task":
+        require __DIR__ . "/Task/create_task.php";
+        break;
+
+    case "get-tasks":
+        require __DIR__ . "/Task/getTasks.php";
+        break;
+
+    // Dropdown
+    case "get-dropdown-students":
+        require __DIR__ . "/Task/getdropdownstuden.php";
+        break;
+
 
     default:
         http_response_code(404);

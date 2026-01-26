@@ -1,9 +1,4 @@
 <?php
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type, Authorization");
-header("Content-Type: application/json");
-
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -60,6 +55,7 @@ if ($user && password_verify($password, $user['password'])) {
     echo json_encode([
         "status" => "success",
         "token" => $jwt,
+            "id" => $user["id"],
         "role" => $user['role']
     ]);
     exit;
